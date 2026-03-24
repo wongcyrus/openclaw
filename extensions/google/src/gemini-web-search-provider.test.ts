@@ -15,4 +15,16 @@ describe("gemini web search provider", () => {
     expect(__testing.resolveGeminiModel({ model: "  " })).toBe("gemini-2.5-flash");
     expect(__testing.resolveGeminiModel({ model: "gemini-2.5-pro" })).toBe("gemini-2.5-pro");
   });
+
+  it("strips trailing slashes from the Gemini baseURL", () => {
+    expect(__testing.resolveGeminiBaseUrl({ baseURL: "http://127.0.0.1:4000/v1beta/" })).toBe(
+      "http://127.0.0.1:4000/v1beta",
+    );
+    expect(__testing.resolveGeminiBaseUrl({ baseURL: "http://127.0.0.1:4000/v1beta///" })).toBe(
+      "http://127.0.0.1:4000/v1beta",
+    );
+    expect(__testing.resolveGeminiBaseUrl({ baseURL: "https://api.example.com" })).toBe(
+      "https://api.example.com",
+    );
+  });
 });

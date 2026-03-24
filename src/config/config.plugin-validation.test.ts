@@ -543,4 +543,24 @@ describe("config plugin validation", () => {
       ).toBe(true);
     }
   });
+
+  it("rejects unknown top-level keys in plugin entries (strictness)", async () => {
+    const res = validateInSuite({
+      plugins: {
+        entries: {
+          discord: {
+            enabled: true,
+            unknownKey: "should-be-rejected",
+          },
+        },
+      },
+    });
+    expect(res.ok).toBe(false);
+    if (!res.ok) {
+      const hasIssue = res.issues.some(
+        (i) => i.path === "plugins.entries.discord" && i.message.includes("Unrecognized key"),
+      );
+      expect(hasIssue).toBe(true);
+    }
+  });
 });

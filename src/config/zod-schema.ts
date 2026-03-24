@@ -164,7 +164,7 @@ const PluginEntrySchema = z
       .optional(),
     config: z.record(z.string(), z.unknown()).optional(),
   })
-  .catchall(z.unknown());
+  .strict();
 
 const TalkProviderEntrySchema = z
   .object({

@@ -79,7 +79,8 @@ function resolveGeminiModel(gemini?: GeminiConfig): string {
 
 function resolveGeminiBaseUrl(gemini?: GeminiConfig): string {
   const baseURL = typeof gemini?.baseURL === "string" ? gemini.baseURL.trim() : "";
-  return baseURL || readProviderEnvValue(["GEMINI_BASE_URL"]) || GEMINI_API_BASE;
+  const resolved = baseURL || readProviderEnvValue(["GEMINI_BASE_URL"]) || GEMINI_API_BASE;
+  return resolved.replace(/\/+$/, "");
 }
 
 async function runGeminiSearch(params: {
