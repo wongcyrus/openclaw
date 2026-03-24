@@ -1097,16 +1097,19 @@ export const GENERATED_BUNDLED_PLUGIN_METADATA = [
       id: "google",
       configSchema: {
         type: "object",
-        additionalProperties: false,
+        additionalProperties: true,
         properties: {
           webSearch: {
             type: "object",
-            additionalProperties: false,
+            additionalProperties: true,
             properties: {
               apiKey: {
                 type: ["string", "object"],
               },
               model: {
+                type: "string",
+              },
+              baseURL: {
                 type: "string",
               },
             },
@@ -1152,6 +1155,10 @@ export const GENERATED_BUNDLED_PLUGIN_METADATA = [
         "webSearch.model": {
           label: "Gemini Search Model",
           help: "Gemini model override for web search grounding.",
+        },
+        "webSearch.baseURL": {
+          label: "Gemini Search Base URL",
+          help: "Override the Gemini API base URL for proxying (e.g. via LiteLLM).",
         },
       },
     },

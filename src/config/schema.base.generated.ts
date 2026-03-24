@@ -11504,7 +11504,7 @@ export const GENERATED_BASE_CONFIG_SCHEMA = {
                   additionalProperties: {},
                 },
               },
-              additionalProperties: false,
+              additionalProperties: {},
             },
           },
           installs: {

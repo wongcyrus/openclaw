@@ -60,6 +60,37 @@ citations.
 **Environment alternative:** set `GEMINI_API_KEY` in the Gateway environment.
 For a gateway install, put it in `~/.openclaw/.env`.
 
+## Using a Proxy (e.g., LiteLLM)
+
+If you are routing OpenClaw through a proxy like [LiteLLM](/providers/litellm), you can override the default Gemini API endpoint:
+
+**Using Environment Variables:**
+Set `GEMINI_BASE_URL` in the Gateway environment:
+
+```bash
+export GEMINI_BASE_URL="http://127.0.0.1:4000/v1beta"
+```
+
+**Using Config:**
+Set `baseURL` in your configuration block:
+
+```json5
+{
+  plugins: {
+    entries: {
+      google: {
+        config: {
+          webSearch: {
+            apiKey: "your-litellm-proxy-key",
+            baseURL: "http://127.0.0.1:4000/v1beta",
+          },
+        },
+      },
+    },
+  },
+}
+```
+
 ## How it works
 
 Unlike traditional search providers that return a list of links and snippets,

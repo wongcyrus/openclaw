@@ -128,6 +128,15 @@ model_list:
 
 OpenClaw keeps requesting `claude-opus-4-6` — LiteLLM handles the routing.
 
+## Web Search Grounding
+
+If you want to proxy OpenClaw's [Gemini Web Search](/tools/gemini-search) through LiteLLM (e.g., for Google Search grounding), configure the Gemini provider to use your LiteLLM endpoint:
+
+```bash
+export GEMINI_BASE_URL="http://127.0.0.1:4000/v1beta"
+export GEMINI_API_KEY="your-litellm-proxy-key"
+```
+
 ## Viewing usage
 
 Check LiteLLM's dashboard or API:

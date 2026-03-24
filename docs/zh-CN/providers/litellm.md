@@ -134,6 +134,15 @@ model_list:
 
 OpenClaw 会继续请求 `claude-opus-4-6` —— 路由由 LiteLLM 处理。
 
+## 网络搜索基础 (Web Search Grounding)
+
+如果你希望通过 LiteLLM 代理 OpenClaw 的 [Gemini 网络搜索](/tools/gemini-search)（例如，用于 Google 搜索结果），可以配置 Gemini 提供商以使用你的 LiteLLM 端点：
+
+```bash
+export GEMINI_BASE_URL="http://127.0.0.1:4000/v1beta"
+export GEMINI_API_KEY="your-litellm-proxy-key"
+```
+
 ## 查看使用情况
 
 检查 LiteLLM 的仪表板或 API：
