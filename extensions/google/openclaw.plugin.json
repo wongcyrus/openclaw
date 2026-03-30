@@ -1,6 +1,9 @@
 {
   "id": "google",
+  "enabledByDefault": true,
   "providers": ["google", "google-gemini-cli"],
+  "autoEnableWhenConfiguredProviders": ["google-gemini-cli"],
+  "cliBackends": ["google-gemini-cli"],
   "providerAuthEnvVars": {
     "google": ["GEMINI_API_KEY", "GOOGLE_API_KEY"]
   },
@@ -44,6 +47,11 @@
       "label": "Gemini Search Base URL",
       "help": "Override the Gemini API base URL for proxying (e.g. via LiteLLM)."
     }
+  },
+  "contracts": {
+    "mediaUnderstandingProviders": ["google"],
+    "imageGenerationProviders": ["google"],
+    "webSearchProviders": ["gemini"]
   },
   "configSchema": {
     "type": "object",
