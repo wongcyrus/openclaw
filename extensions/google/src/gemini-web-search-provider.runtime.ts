@@ -21,7 +21,6 @@ import {
   resolveSearchTimeoutSeconds,
   type SearchConfigRecord,
   withSelfHostedWebSearchEndpoint,
-  withTrustedWebSearchEndpoint,
   wrapWebContent,
   writeCachedSearchPayload,
 } from "openclaw/plugin-sdk/provider-web-search";
@@ -272,7 +271,7 @@ async function runGeminiSearch(params: {
 
   const endpoint = `${baseUrl}/models/${params.model}:generateContent`;
 
-  return withTrustedWebSearchEndpoint(
+  return withSelfHostedWebSearchEndpoint(
     {
       url: endpoint,
       timeoutSeconds: params.timeoutSeconds,
