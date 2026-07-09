@@ -1,7 +1,7 @@
 // Google tests cover web search provider plugin behavior.
 import type { OpenClawConfig } from "openclaw/plugin-sdk/config-contracts";
 import { withEnv, withEnvAsync, withFetchPreconnect } from "openclaw/plugin-sdk/test-env";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { testing, createGeminiWebSearchProvider } from "./src/gemini-web-search-provider.js";
 
 type TestModelProviderConfig = NonNullable<
@@ -80,10 +80,17 @@ function parseGeminiFetchBody(mockFetch: ReturnType<typeof installGeminiFetch>):
   };
 }
 
+beforeEach(() => {
+  vi.stubEnv("GEMINI_BASE_URL", "");
+  vi.stubEnv("GOOGLE_GEMINI_BASE_URL", "");
+  vi.stubEnv("GOOGLE_GEMINI_ENDPOINT", "");
+});
+
 afterEach(() => {
   vi.useRealTimers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 describe("google web search provider", () => {

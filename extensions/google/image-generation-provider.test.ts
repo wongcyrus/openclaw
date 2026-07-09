@@ -85,6 +85,9 @@ function postJsonRequestOptions(spy: unknown): {
 describe("Google image-generation provider", () => {
   beforeEach(() => {
     ssrfMock = mockPinnedHostnameResolution();
+    vi.stubEnv("GEMINI_BASE_URL", "");
+    vi.stubEnv("GOOGLE_GEMINI_BASE_URL", "");
+    vi.stubEnv("GOOGLE_GEMINI_ENDPOINT", "");
   });
 
   afterEach(() => {
@@ -92,6 +95,7 @@ describe("Google image-generation provider", () => {
     ssrfMock = undefined;
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
   it("generates image buffers from the Gemini generateContent API", async () => {

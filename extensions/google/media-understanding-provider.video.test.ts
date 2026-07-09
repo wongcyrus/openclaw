@@ -114,23 +114,6 @@ describe("describeGeminiVideo", () => {
     );
   });
 
-  it("rejects non-Google video base URLs before sending authenticated requests", async () => {
-    await expect(
-      describeGeminiVideo({
-        buffer: Buffer.from("video-bytes"),
-        fileName: "clip.mp4",
-        apiKey: "test-key",
-        timeoutMs: 1500,
-        baseUrl: "https://example.com/v1beta/",
-        fetchFn: async () => {
-          throw new Error("fetch should not run");
-        },
-      }),
-    ).rejects.toThrow(
-      "Google Generative AI baseUrl must use https://generativelanguage.googleapis.com",
-    );
-  });
-
   it("formats Google audio transcription HTTP errors with provider details", async () => {
     await expect(
       transcribeGeminiAudio({

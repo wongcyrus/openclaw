@@ -29,6 +29,7 @@ import {
   resolveGeminiConfig,
   resolveGeminiBaseUrl,
   resolveGeminiModel,
+  resolveGeminiApiType,
   type GeminiConfig,
 } from "./gemini-web-search-provider.shared.js";
 
@@ -59,6 +60,25 @@ type GeminiGroundingResponse = {
     code?: number;
     message?: string;
     status?: string;
+  };
+};
+
+type OpenAICompatibleChatResponse = {
+  choices?: Array<{
+    message?: {
+      content?: string;
+    };
+  }>;
+  grounding_metadata?: {
+    groundingChunks?: Array<{
+      web?: {
+        uri?: string;
+        title?: string;
+      };
+    }>;
+  };
+  error?: {
+    message?: string;
   };
 };
 
@@ -182,13 +202,74 @@ async function runGeminiSearch(params: {
   apiKey: string;
   baseUrl: string;
   model: string;
+  apiType: "gemini" | "openai-compatible";
   timeoutSeconds: number;
   signal?: AbortSignal;
   timeRangeFilter?: GeminiTimeRangeFilter;
 }): Promise<{ content: string; citations: Array<{ url: string; title?: string }> }> {
-  const endpoint = `${params.baseUrl}/models/${params.model}:generateContent`;
+  let baseUrl = params.baseUrl.trim().replace(/\/$/, "");
   const googleSearch =
     params.timeRangeFilter === undefined ? {} : { timeRangeFilter: params.timeRangeFilter };
+
+  if (params.apiType === "gemini" && baseUrl.endsWith("/openai")) {
+    baseUrl = baseUrl.replace(/\/openai$/, "");
+  }
+
+  if (params.apiType === "openai-compatible") {
+    const endpoint = `${baseUrl}/chat/completions`;
+    return withTrustedWebSearchEndpoint(
+      {
+        url: endpoint,
+        timeoutSeconds: params.timeoutSeconds,
+        signal: params.signal,
+        init: {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${params.apiKey}`,
+          },
+          body: JSON.stringify({
+            model: params.model,
+            messages: [{ role: "user", content: params.query }],
+            tools: [{ google_search: googleSearch }],
+          }),
+        },
+      },
+      async (res) => {
+        if (!res.ok) {
+          const detail = (await res.text()) || res.statusText;
+          throw new Error(`OpenAI-compatible API error (${res.status}) at ${endpoint}: ${detail}`);
+        }
+        const data = (await res.json()) as OpenAICompatibleChatResponse;
+        if (data.error) {
+          throw new Error(`API error: ${data.error.message}`);
+        }
+
+        const choice = data.choices?.[0];
+        const content = choice?.message?.content ?? "No response";
+        const rawCitations = (data.grounding_metadata?.groundingChunks ?? [])
+          .filter((chunk) => chunk.web?.uri)
+          .map((chunk) => ({
+            url: chunk.web!.uri!,
+            title: chunk.web?.title || undefined,
+          }));
+
+        const citations: Array<{ url: string; title?: string }> = [];
+        for (let index = 0; index < rawCitations.length; index += 10) {
+          const batch = rawCitations.slice(index, index + 10);
+          const resolved = await Promise.all(
+            batch.map(async (citation) =>
+              Object.assign({}, citation, { url: await resolveCitationRedirectUrl(citation.url) }),
+            ),
+          );
+          citations.push(...resolved);
+        }
+        return { content, citations };
+      },
+    );
+  }
+
+  const endpoint = `${baseUrl}/models/${params.model}:generateContent`;
 
   return withTrustedWebSearchEndpoint(
     {
@@ -331,11 +412,13 @@ export async function executeGeminiSearch(
     undefined;
   const model = resolveGeminiModel(geminiConfig);
   const baseUrl = resolveGeminiBaseUrl(geminiConfig);
+  const apiType = resolveGeminiApiType(geminiConfig);
   const cacheKey = buildSearchCacheKey([
     "gemini",
     query,
     resolveSearchCount(count, DEFAULT_SEARCH_COUNT),
     baseUrl,
+    apiType,
     model,
     timeRange.freshness,
     timeRange.timeRangeFilter?.startTime,
@@ -352,6 +435,7 @@ export async function executeGeminiSearch(
     apiKey,
     baseUrl,
     model,
+    apiType,
     timeoutSeconds: resolveSearchTimeoutSeconds(searchConfig),
     signal: context?.signal,
     timeRangeFilter: timeRange.timeRangeFilter,
