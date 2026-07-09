@@ -20,6 +20,7 @@ import {
   resolveSearchCount,
   resolveSearchTimeoutSeconds,
   type SearchConfigRecord,
+  withSelfHostedWebSearchEndpoint,
   withTrustedWebSearchEndpoint,
   wrapWebContent,
   writeCachedSearchPayload,
@@ -217,7 +218,7 @@ async function runGeminiSearch(params: {
 
   if (params.apiType === "openai-compatible") {
     const endpoint = `${baseUrl}/chat/completions`;
-    return withTrustedWebSearchEndpoint(
+    return withSelfHostedWebSearchEndpoint(
       {
         url: endpoint,
         timeoutSeconds: params.timeoutSeconds,
