@@ -1,21 +1,32 @@
+/**
+ * image_generate action helpers.
+ *
+ * Handles provider listing, task status, and duplicate-guard output for the image generation tool.
+ */
 import type { OpenClawConfig } from "../../config/types.openclaw.js";
 import { listRuntimeImageGenerationProviders } from "../../image-generation/runtime.js";
 import type { ImageGenerationProvider } from "../../image-generation/types.js";
 import type { AuthProfileStore } from "../auth-profiles/types.js";
 import {
+  buildImageGenerationTaskStatusListDetails,
+  buildImageGenerationTaskStatusListText,
   buildImageGenerationTaskStatusDetails,
   buildImageGenerationTaskStatusText,
   findActiveImageGenerationTaskForSession,
+  findDuplicateGuardImageGenerationTaskForSession,
+  listActiveImageGenerationTasksForSession,
 } from "../image-generation-task-status.js";
 import {
+  createMediaGenerateDuplicateGuardResult,
   createMediaGenerateProviderListActionResult,
   createMediaGenerateTaskStatusActions,
   type MediaGenerateActionResult,
 } from "./media-generate-tool-actions-shared.js";
 
-export type ImageGenerateActionResult = MediaGenerateActionResult;
+type ImageGenerateActionResult = MediaGenerateActionResult;
 
-export function formatImageGenerationAuthHint(provider: {
+/** Formats provider auth setup hints for the image generation `list` action. */
+function formatImageGenerationAuthHint(provider: {
   id: string;
   authEnvVars: readonly string[];
 }): string | undefined {
@@ -28,11 +39,13 @@ export function formatImageGenerationAuthHint(provider: {
   return `set ${provider.authEnvVars.join(" / ")} to use ${provider.id}/*`;
 }
 
-export function listSupportedImageGenerationModes(provider: ImageGenerationProvider): string[] {
+/** Lists supported image-generation modes exposed by a provider. */
+function listSupportedImageGenerationModes(provider: ImageGenerationProvider): string[] {
   return ["generate", ...(provider.capabilities.edit.enabled ? ["edit"] : [])];
 }
 
-export function summarizeImageGenerationCapabilities(provider: ImageGenerationProvider): string {
+/** Formats provider capability details for the image generation `list` action. */
+function summarizeImageGenerationCapabilities(provider: ImageGenerationProvider): string {
   const caps: string[] = [];
   if (provider.capabilities.edit.enabled) {
     const maxRefs = provider.capabilities.edit.maxInputImages;
@@ -58,8 +71,10 @@ export function summarizeImageGenerationCapabilities(provider: ImageGenerationPr
   return caps.join("; ");
 }
 
+/** Builds the image-generation provider listing result shown to the agent. */
 export function createImageGenerateListActionResult(params: {
   cfg?: OpenClawConfig;
+  workspaceDir?: string;
   agentDir?: string;
   authStore?: AuthProfileStore;
 }): ImageGenerateActionResult {
@@ -69,6 +84,7 @@ export function createImageGenerateListActionResult(params: {
     providers,
     emptyText: "No image-generation providers are registered.",
     cfg: params.cfg,
+    workspaceDir: params.workspaceDir,
     agentDir: params.agentDir,
     authStore: params.authStore,
     listModes: listSupportedImageGenerationModes,
@@ -84,33 +100,34 @@ const imageGenerateTaskStatusActions = createMediaGenerateTaskStatusActions({
   buildStatusDetails: buildImageGenerationTaskStatusDetails,
 });
 
+/** Builds status output for active image-generation tasks in the current session. */
 export function createImageGenerateStatusActionResult(
   sessionKey?: string,
 ): ImageGenerateActionResult {
+  const activeTasks = listActiveImageGenerationTasksForSession(sessionKey);
+  if (activeTasks.length > 1) {
+    return {
+      content: [{ type: "text", text: buildImageGenerationTaskStatusListText(activeTasks) }],
+      details: {
+        action: "status",
+        ...buildImageGenerationTaskStatusListDetails(activeTasks),
+      },
+    };
+  }
   return imageGenerateTaskStatusActions.createStatusActionResult(sessionKey);
 }
 
+/** Returns duplicate-guard status output when a matching image task is already active. */
 export function createImageGenerateDuplicateGuardResult(
   sessionKey?: string,
-  params?: { prompt?: string },
+  params?: { prompt?: string; requestKey?: string },
 ): ImageGenerateActionResult | undefined {
-  const activeTask = findActiveImageGenerationTaskForSession(sessionKey, {
+  return createMediaGenerateDuplicateGuardResult({
+    sessionKey,
     prompt: params?.prompt,
+    requestKey: params?.requestKey,
+    findDuplicateTask: findDuplicateGuardImageGenerationTaskForSession,
+    buildStatusText: buildImageGenerationTaskStatusText,
+    buildStatusDetails: buildImageGenerationTaskStatusDetails,
   });
-  if (!activeTask) {
-    return undefined;
-  }
-  return {
-    content: [
-      {
-        type: "text",
-        text: buildImageGenerationTaskStatusText(activeTask, { duplicateGuard: true }),
-      },
-    ],
-    details: {
-      action: "status",
-      duplicateGuard: true,
-      ...buildImageGenerationTaskStatusDetails(activeTask),
-    },
-  };
 }

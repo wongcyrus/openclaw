@@ -1,5 +1,10 @@
+// Diagnostic stability tests cover stable diagnostic output under repeated events.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { emitDiagnosticEvent, resetDiagnosticEventsForTest } from "../infra/diagnostic-events.js";
+import {
+  emitDiagnosticEvent,
+  resetDiagnosticEventsForTest,
+  waitForDiagnosticEventsDrained,
+} from "../infra/diagnostic-events.js";
 import {
   getDiagnosticStabilitySnapshot,
   normalizeDiagnosticStabilityQuery,
@@ -65,7 +70,9 @@ describe("diagnostic stability recorder", () => {
       durationMs: 12,
       byteLength: 345,
     });
-    await new Promise<void>((resolve) => setImmediate(resolve));
+    await new Promise<void>((resolve) => {
+      setImmediate(resolve);
+    });
 
     const snapshot = getDiagnosticStabilitySnapshot({ limit: 10 });
 
@@ -233,7 +240,9 @@ describe("diagnostic stability recorder", () => {
       contextTokenBudget: 200_000,
       reserveTokens: 20_000,
     });
-    await new Promise<void>((resolve) => setImmediate(resolve));
+    await new Promise<void>((resolve) => {
+      setImmediate(resolve);
+    });
 
     const snapshot = getDiagnosticStabilitySnapshot({ limit: 10 });
 
@@ -280,7 +289,9 @@ describe("diagnostic stability recorder", () => {
         arrayBuffersBytes: 10,
       },
     });
-    await new Promise<void>((resolve) => setImmediate(resolve));
+    await new Promise<void>((resolve) => {
+      setImmediate(resolve);
+    });
 
     const snapshot = getDiagnosticStabilitySnapshot({ limit: 10 });
 
@@ -408,6 +419,52 @@ describe("diagnostic stability recorder", () => {
       type: "payload.large",
       action: "chunked",
     });
+  });
+
+  it("keeps async queue drop summaries after drained queued events for sinceSeq polling", async () => {
+    startDiagnosticStabilityRecorder();
+
+    for (let index = 0; index < 10_001; index += 1) {
+      emitDiagnosticEvent({
+        type: "model.call.started",
+        runId: `overflow-run-${index}`,
+        callId: `overflow-call-${index}`,
+        provider: "openai",
+        model: "gpt-5.4",
+      });
+    }
+
+    await new Promise<void>((resolve) => {
+      setImmediate(resolve);
+    });
+
+    const midDrainSnapshot = getDiagnosticStabilitySnapshot({ limit: 1000 });
+    expect(midDrainSnapshot.lastSeq).toBe(100);
+    expect(
+      midDrainSnapshot.events.some((event) => event.type === "diagnostic.async_queue.dropped"),
+    ).toBe(false);
+
+    await waitForDiagnosticEventsDrained();
+
+    const sinceMidDrain = getDiagnosticStabilitySnapshot({
+      sinceSeq: midDrainSnapshot.lastSeq,
+      limit: 1000,
+    });
+    const dropSummary = sinceMidDrain.events.find(
+      (event) => event.type === "diagnostic.async_queue.dropped",
+    );
+    expectFields(dropSummary, {
+      type: "diagnostic.async_queue.dropped",
+      droppedEvents: 1,
+      droppedUntrustedEvents: 1,
+      queueLength: 0,
+      maxQueueLength: 10_000,
+      drainBatchSize: 100,
+    });
+    expect(
+      sinceMidDrain.events.filter((event) => event.type === "model.call.started"),
+    ).not.toHaveLength(0);
+    expect(sinceMidDrain.lastSeq).toBeGreaterThan(10_000);
   });
 
   it("applies query filters to persisted snapshots without mutating the source", () => {

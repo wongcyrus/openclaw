@@ -1,3 +1,4 @@
+// Google tests cover media understanding provider.video plugin behavior.
 import {
   createRequestCaptureJsonFetch,
   installPinnedHostnameTestHooks,
@@ -110,23 +111,6 @@ describe("describeGeminiVideo", () => {
     expect(body.contents?.[0]?.parts?.[1]?.inline_data?.mime_type).toBe("video/mp4");
     expect(body.contents?.[0]?.parts?.[1]?.inline_data?.data).toBe(
       Buffer.from("video-bytes").toString("base64"),
-    );
-  });
-
-  it("rejects non-Google video base URLs before sending authenticated requests", async () => {
-    await expect(
-      describeGeminiVideo({
-        buffer: Buffer.from("video-bytes"),
-        fileName: "clip.mp4",
-        apiKey: "test-key",
-        timeoutMs: 1500,
-        baseUrl: "https://example.com/v1beta/",
-        fetchFn: async () => {
-          throw new Error("fetch should not run");
-        },
-      }),
-    ).rejects.toThrow(
-      "Google Generative AI baseUrl must use https://generativelanguage.googleapis.com",
     );
   });
 

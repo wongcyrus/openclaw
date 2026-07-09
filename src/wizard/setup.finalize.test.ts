@@ -1,3 +1,4 @@
+// Setup finalize tests cover writing final onboarding config and artifacts.
 import fs from "node:fs/promises";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createWizardPrompter as buildWizardPrompter } from "../../test/helpers/wizard-prompter.js";
@@ -150,7 +151,7 @@ vi.mock("../infra/control-ui-assets.js", () => ({
   ensureControlUiAssetsBuilt: vi.fn(async () => ({ ok: true })),
 }));
 
-vi.mock("../terminal/restore.js", () => ({
+vi.mock("../../packages/terminal-core/src/restore.js", () => ({
   restoreTerminalState,
 }));
 
@@ -187,6 +188,7 @@ function createWebSearchProviderEntry(
     | "placeholder"
     | "signupUrl"
     | "credentialPath"
+    | "requiresCredential"
   >,
 ): PluginWebSearchProviderEntry {
   return {
@@ -539,10 +541,10 @@ describe("finalizeSetupWizard", () => {
     ).rejects.toThrow("TUI exited with code 1");
 
     expect(restoreTerminalState).toHaveBeenCalledWith("pre-setup tui", {
-      resumeStdinIfPaused: true,
+      resumeStdinIfPaused: false,
     });
     expect(restoreTerminalState).toHaveBeenCalledWith("post-setup tui", {
-      resumeStdinIfPaused: true,
+      resumeStdinIfPaused: false,
     });
   });
 
@@ -592,6 +594,43 @@ describe("finalizeSetupWizard", () => {
     expect(buildGatewayInstallPlan).toHaveBeenCalledTimes(1);
     expectFirstOnboardingInstallPlanCallOmitsToken();
     expect(gatewayServiceInstall).toHaveBeenCalledTimes(1);
+  });
+
+  it("suppresses token-bearing onboarding output when requested", async () => {
+    const prompter = createLaterPrompter();
+
+    await finalizeSetupWizard({
+      flow: "advanced",
+      opts: {
+        acceptRisk: true,
+        authChoice: "skip",
+        installDaemon: false,
+        skipHealth: true,
+        skipUi: true,
+        suppressGatewayTokenOutput: true,
+      },
+      baseConfig: {},
+      nextConfig: {},
+      workspaceDir: "/tmp",
+      settings: {
+        port: 18789,
+        bind: "loopback",
+        authMode: "token",
+        gatewayToken: "session-token",
+        tailscaleMode: "off",
+        tailscaleResetOnExit: false,
+      },
+      prompter,
+      runtime: createRuntime(),
+    });
+
+    const output = vi
+      .mocked(prompter.note)
+      .mock.calls.map((call) => call.join("\n"))
+      .join("\n");
+    expect(output).toContain("http://127.0.0.1:18789");
+    expect(output).not.toContain("session-token");
+    expect(output).not.toContain("#token=");
   });
 
   it("stops after a scheduled restart instead of reinstalling the service", async () => {
@@ -799,6 +838,49 @@ describe("finalizeSetupWizard", () => {
         type: "oauth",
       }),
     );
+  });
+
+  it("reports a keyless provider as ready without prompting for an API key", async () => {
+    listConfiguredWebSearchProviders.mockReturnValue([
+      createWebSearchProviderEntry({
+        id: "parallel-free",
+        label: "Parallel Search (Free)",
+        hint: "Free web search via Parallel's hosted Search MCP",
+        envVars: [],
+        placeholder: "",
+        signupUrl: "https://parallel.ai",
+        credentialPath: "",
+        requiresCredential: false,
+      }),
+    ]);
+
+    const prompter = createLaterPrompter();
+
+    await finalizeSetupWizard(
+      createAdvancedFinalizeArgs({
+        nextConfig: {
+          tools: { web: { search: { provider: "parallel-free", enabled: true } } },
+        },
+        prompter,
+      }),
+    );
+
+    expectNoteContains(
+      prompter,
+      "Web search is ready — this provider works with no API key.",
+      "Web search",
+    );
+    // The credential-required warning must NOT appear for a keyless provider.
+    expect(
+      vi
+        .mocked(prompter.note)
+        .mock.calls.some(
+          ([message, title]) =>
+            title === "Web search" &&
+            (message.includes("no API key was found") ||
+              message.includes("will not work until a key is added")),
+        ),
+    ).toBe(false);
   });
 
   it("uses the setup token for health checks to avoid local env token drift", async () => {

@@ -1,7 +1,16 @@
+// Builds setup metadata for self-hosted provider plugins.
+import {
+  findNormalizedProviderValue,
+  normalizeProviderId,
+} from "@openclaw/model-catalog-core/provider-id";
+import {
+  normalizeOptionalString,
+  normalizeStringifiedOptionalString,
+} from "@openclaw/normalization-core/string-coerce";
+import { uniqueStrings } from "@openclaw/normalization-core/string-normalization";
 import type { ApiKeyCredential, AuthProfileCredential } from "../agents/auth-profiles/types.js";
 import { upsertAuthProfileWithLock } from "../agents/auth-profiles/upsert-with-lock.js";
 import { parseConfiguredModelVisibilityEntries } from "../agents/model-selection-shared.js";
-import { findNormalizedProviderValue, normalizeProviderId } from "../agents/provider-id.js";
 import {
   SELF_HOSTED_DEFAULT_CONTEXT_WINDOW,
   SELF_HOSTED_DEFAULT_COST,
@@ -12,10 +21,6 @@ import type { OpenClawConfig } from "../config/types.openclaw.js";
 import { fetchWithSsrFGuard } from "../infra/net/fetch-guard.js";
 import type { SsrFPolicy } from "../infra/net/ssrf.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
-import {
-  normalizeOptionalString,
-  normalizeStringifiedOptionalString,
-} from "../shared/string-coerce.js";
 import { normalizeOptionalSecretInput } from "../utils/normalize-secret-input.js";
 import type { WizardPrompter } from "../wizard/prompts.js";
 import { applyAuthProfileConfig } from "./provider-auth-helpers.js";
@@ -81,6 +86,12 @@ function readPositiveInteger(value: unknown): number | undefined {
   return Math.trunc(value);
 }
 
+async function cancelUnreadResponseBody(response: Response): Promise<void> {
+  if (!response.bodyUsed) {
+    await response.body?.cancel().catch(() => undefined);
+  }
+}
+
 function resolveLlamaCppPropsUrl(baseUrl: string, modelId?: string): string {
   const parsed = new URL(baseUrl);
   const pathname = parsed.pathname.replace(/\/+$/, "");
@@ -119,6 +130,7 @@ async function discoverLlamaCppRuntimeContextTokens(params: {
     });
     try {
       if (!response.ok) {
+        await cancelUnreadResponseBody(response);
         return undefined;
       }
       const data = (await response.json()) as LlamaCppPropsResponse;
@@ -162,6 +174,7 @@ export async function discoverOpenAICompatibleLocalModels(params: {
     });
     try {
       if (!response.ok) {
+        await cancelUnreadResponseBody(response);
         log.warn(`Failed to discover ${params.label} models: ${response.status}`);
         return [];
       }
@@ -181,7 +194,7 @@ export async function discoverOpenAICompatibleLocalModels(params: {
       });
       const runtimeContextTokensByModelId = new Map<string, number>();
       if (params.contextWindow === undefined) {
-        const uniqueModelIds = [...new Set(discoveredModels.map((model) => model.id))];
+        const uniqueModelIds = uniqueStrings(discoveredModels.map((model) => model.id));
         const runtimeContextTokenResults = await Promise.all(
           uniqueModelIds.map(
             async (modelId) =>
