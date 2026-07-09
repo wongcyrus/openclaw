@@ -231,7 +231,7 @@ async function runGeminiSearch(params: {
           body: JSON.stringify({
             model: params.model,
             messages: [{ role: "user", content: params.query }],
-            tools: [{ google_search: googleSearch }],
+            tools: [{ googleSearch: googleSearch }],
           }),
         },
       },
